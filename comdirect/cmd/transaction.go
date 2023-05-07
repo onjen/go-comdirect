@@ -4,15 +4,17 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
+	"strings"
+
 	"github.com/jsattler/go-comdirect/pkg/comdirect"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
-	"log"
-	"os"
 )
 
 var (
-	transactionHeader = []string{"REMITTER", "DEPTOR", "BOOKING DATE", "STATUS", "TYPE", "VALUE", "UNIT"}
+	transactionHeader = []string{"REMITTER", "DEPTOR", "BOOKING DATE", "STATUS", "INFO", "TYPE", "VALUE", "UNIT"}
 	transactionCmd    = &cobra.Command{
 		Use:   "transaction",
 		Short: "list account transactions",
@@ -54,6 +56,20 @@ func printJSON(v interface{}) {
 	fmt.Println(string(b))
 }
 
+func cleanRemittanceInfo(remittanceInfo string) string {
+	var cleanedInfo string
+	// every line is 2 (line number, zero padded) + 35 (text) characters long
+	for i := 0; i < len(remittanceInfo)/37; i++ {
+		currentLine := remittanceInfo[(i*37)+2 : ((i + 1) * 37)]
+		if strings.Contains(currentLine, "End-to-End-Ref") {
+			break
+		}
+		cleanedInfo += strings.TrimRight(currentLine, " ")
+		cleanedInfo += " "
+	}
+	return cleanedInfo
+}
+
 func printTransactionCSV(transactions *comdirect.AccountTransactions) {
 	table := csv.NewWriter(os.Stdout)
 	table.Write(transactionHeader)
@@ -64,7 +80,7 @@ func printTransactionCSV(transactions *comdirect.AccountTransactions) {
 		} else if holderName == "" {
 			holderName = "N/A"
 		}
-		table.Write([]string{holderName, t.Creditor.HolderName, t.BookingDate, t.BookingStatus, t.TransactionType.Text, formatAmountValue(t.Amount), t.Amount.Unit})
+		table.Write([]string{holderName, t.Creditor.HolderName, t.BookingDate, t.BookingStatus, cleanRemittanceInfo(t.RemittanceInfo), t.TransactionType.Text, formatAmountValue(t.Amount), t.Amount.Unit})
 	}
 	table.Flush()
 }
@@ -82,7 +98,7 @@ func printTransactionTable(transactions *comdirect.AccountTransactions) {
 		} else if holderName == "" {
 			holderName = "N/A"
 		}
-		table.Append([]string{holderName, t.Creditor.HolderName, t.BookingDate, t.BookingStatus, t.TransactionType.Text, formatAmountValue(t.Amount), t.Amount.Unit})
+		table.Append([]string{holderName, t.Creditor.HolderName, t.BookingDate, t.BookingStatus, cleanRemittanceInfo(t.RemittanceInfo), t.TransactionType.Text, formatAmountValue(t.Amount), t.Amount.Unit})
 	}
 	table.Render()
 }
