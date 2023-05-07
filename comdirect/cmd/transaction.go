@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	transactionHeader = []string{"REMITTER", "DEPTOR", "BOOKING DATE", "STATUS", "INFO", "TYPE", "VALUE", "UNIT"}
+	transactionHeader = []string{"DESCRIPTION", "BOOKING DATE", "STATUS", "TYPE", "VALUE", "UNIT"}
 	transactionCmd    = &cobra.Command{
 		Use:   "transaction",
 		Short: "list account transactions",
@@ -75,12 +75,17 @@ func printTransactionCSV(transactions *comdirect.AccountTransactions) {
 	table.Write(transactionHeader)
 	for _, t := range transactions.Values {
 		holderName := t.Remitter.HolderName
-		if len(holderName) > 30 {
-			holderName = holderName[:30]
-		} else if holderName == "" {
-			holderName = "N/A"
+		var description string
+		if len(holderName) > 0 {
+			description += holderName + " "
 		}
-		table.Write([]string{holderName, t.Creditor.HolderName, t.BookingDate, t.BookingStatus, cleanRemittanceInfo(t.RemittanceInfo), t.TransactionType.Text, formatAmountValue(t.Amount), t.Amount.Unit})
+		if len(t.Creditor.HolderName) > 0 {
+			description += t.Creditor.HolderName + " "
+		}
+		description += cleanRemittanceInfo(t.RemittanceInfo)
+		if t.BookingStatus == "BOOKED" {
+			table.Write([]string{description, t.BookingDate, t.BookingStatus, t.TransactionType.Text, formatAmountValue(t.Amount), t.Amount.Unit})
+		}
 	}
 	table.Flush()
 }
@@ -93,12 +98,20 @@ func printTransactionTable(transactions *comdirect.AccountTransactions) {
 	table.SetCaption(true, fmt.Sprintf("%d out of %d", len(transactions.Values), transactions.Paging.Matches))
 	for _, t := range transactions.Values {
 		holderName := t.Remitter.HolderName
-		if len(holderName) > 30 {
-			holderName = holderName[:30]
-		} else if holderName == "" {
-			holderName = "N/A"
+		var description string
+		if len(holderName) > 0 {
+			description += holderName + " "
 		}
-		table.Append([]string{holderName, t.Creditor.HolderName, t.BookingDate, t.BookingStatus, cleanRemittanceInfo(t.RemittanceInfo), t.TransactionType.Text, formatAmountValue(t.Amount), t.Amount.Unit})
+		if len(t.Creditor.HolderName) > 0 {
+			description += t.Creditor.HolderName + " "
+		}
+		description += cleanRemittanceInfo(t.RemittanceInfo)
+		if len(description) > 30 {
+			description = description[:30]
+		}
+		if t.BookingStatus == "BOOKED" {
+			table.Append([]string{description, t.BookingDate, t.BookingStatus, t.TransactionType.Text, formatAmountValue(t.Amount), t.Amount.Unit})
+		}
 	}
 	table.Render()
 }
